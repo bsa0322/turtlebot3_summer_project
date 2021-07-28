@@ -1,8 +1,5 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
-#include <tf/transform_broadcaster.h>
-#include <nav_msgs/Odometry.h>
-#include <std_msgs/String.h>
 
 #include <stdio.h>
 #include <unistd.h>
@@ -15,12 +12,53 @@
 // Reminder message
 const char* msg = R"(
 
-This code move turtlebot straight.
+Control Your TurtleBot3!
+---------------------------
+Moving around:
+        w
+   a    s    d
+        x
+
+w/x : increase/decrease linear velocity (Burger : ~ 0.22, Waffle and Waffle Pi : ~ 0.26)
+a/d : increase/decrease angular velocity (Burger : ~ 2.84, Waffle and Waffle Pi : ~ 1.82)
+
+space key, s : force stop
+
+CTRL-C to quit
 
 )";
 
 #define LIN_VEL_STEP_SIZE 0.01
 #define ANG_VEL_STEP_SIZE 0.1
+
+// For non-blocking keyboard inputs
+int getch(void)
+{
+  int ch;
+  struct termios oldt;
+  struct termios newt;
+
+  // Store old settings, and copy to new settings
+  tcgetattr(STDIN_FILENO, &oldt);
+  newt = oldt;
+
+  // Make required changes and apply the settings
+  newt.c_lflag &= ~(ICANON | ECHO);
+  newt.c_iflag |= IGNBRK;
+  newt.c_iflag &= ~(INLCR | ICRNL | IXON | IXOFF);
+  newt.c_lflag &= ~(ICANON | ECHO | ECHOK | ECHOE | ECHONL | ISIG | IEXTEN);
+  newt.c_cc[VMIN] = 1;
+  newt.c_cc[VTIME] = 0;
+  tcsetattr(fileno(stdin), TCSANOW, &newt);
+
+  // Get the current character
+  ch = getchar();
+
+  // Reapply old settings
+  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
+  return ch;
+}
 
 float makeSimpleProfile(float output, float input, float slop)
 {
@@ -34,22 +72,14 @@ float makeSimpleProfile(float output, float input, float slop)
   return output;
 }
 
-void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
-{
-  ROS_INFO("I received odom: [%f, %f, %f]", odom->twist.twist.linear.x, odom->pose.pose.position.y, odom->pose.pose.position.z); //받았다는 걸 명시...!
-}
-
 int main(int argc, char** argv)
 {
   // Init ROS node
-  ros::init(argc, argv, "turtlebot3_to_goal");
+  ros::init(argc, argv, "teleop_twist_keyboard");
   ros::NodeHandle nh;
 
   // Init cmd_vel publisher
   ros::Publisher pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-
-  // Init odom subsciber
-  ros::Subscriber sub = nh.subscribe("odom", 1000, odomCallback);
 
   // Create Twist message
   geometry_msgs::Twist twist;
@@ -59,21 +89,47 @@ int main(int argc, char** argv)
   float target_angular_vel  = 0.0;
   float control_linear_vel  = 0.0;
   float control_angular_vel = 0.0;
-
-  double current_x = odom.pose.pose.position.x;
-  double current_y = odom.pose.pose.position.y;
-  double current_z = odom.pose.pose.position.z;
-
-  double goal_x = 0.1;
+  char key = ' ';
 
   printf("%s", msg);
 
-  while(current_x < goal_x){
+  while(true){
 
-    target_linear_vel = LIN_VEL_STEP_SIZE;
+    // Get the pressed key
+    key = getch();
+
+    if(key == 'w')
+    {
+      target_linear_vel+=LIN_VEL_STEP_SIZE;
+    }
+    else if(key == 'x')
+    {
+      target_linear_vel-=LIN_VEL_STEP_SIZE;
+    }
+    else if(key=='a')
+    {
+      target_angular_vel+=ANG_VEL_STEP_SIZE;
+    }
+    else if(key=='d')
+    {
+      target_angular_vel-=ANG_VEL_STEP_SIZE;
+    }
+    else if(key == ' ' || key == 's')
+    {
+      target_linear_vel   = 0.0;
+      control_linear_vel  = 0.0;
+      target_angular_vel  = 0.0;          
+      control_angular_vel = 0.0;
+    }
+    else if(key == '\x03')
+    {
+      break;
+    }
 
     control_linear_vel = makeSimpleProfile(control_linear_vel, target_linear_vel, (LIN_VEL_STEP_SIZE/2.0));
     control_angular_vel = makeSimpleProfile(control_angular_vel, target_angular_vel, (ANG_VEL_STEP_SIZE/2.0));
+    
+    printf("\rCurrent: speed %f\tturn %f | Invalid command! %c", control_linear_vel, control_angular_vel, key);
 
     // Update the Twist message
     twist.linear.x = control_linear_vel;
@@ -91,5 +147,4 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
 
