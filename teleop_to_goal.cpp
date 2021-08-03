@@ -3,6 +3,7 @@
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/String.h>
 
+#include <stdio.h>
 #include <cmath>
 
 // Reminder message
@@ -14,37 +15,29 @@ This code move turtlebot straight.
 
 //amcl
 // Init variables
-float target_linear_vel   = 0.1;
-double current_x = 0; 
-double goal_x = 0.5;
+double current_x; 
+
+ros::Publisher pub;
+geometry_msgs::Twist twist;
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
 {
-  ROS_INFO("I received odom: [%f, %f, %f] goal : %f", current_x, odom->pose.pose.position.y, odom->pose.pose.position.z, goal_x); //받았다는 걸 명시...!
   current_x = odom->pose.pose.position.x;
+  ROS_INFO("I received odom: [%f, %f, %f]", current_x, odom->pose.pose.position.y, odom->pose.pose.position.z); //받았다는 걸 명시...!
 }
 
-int main(int argc, char** argv)
+void to_goal(double goal_x)
 {
-  // Init ROS node
-  ros::init(argc, argv, "turtlebot3_to_goal");
-  ros::NodeHandle nh;
-
-  // Init cmd_vel publisher
-  ros::Publisher pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
-  // Create Twist message
-  geometry_msgs::Twist twist;
-
-  // Init odom subsciber
-  ros::Subscriber sub = nh.subscribe("/odom", 1000, odomCallback);  
-
-  printf("%s", msg);
-
-  while(std::abs(goal_x - current_x) > 0.1){
-    target_linear_vel = (goal_x - current_x) * 0.1;
+  float cur_speed = 0;
+  ros::Rate loop_rate(10);
+  while(std::abs(goal_x - current_x) > 0.001)
+  {
+    cur_speed = goal_x - current_x;
+    if(cur_speed > 0.2) cur_speed = 0.2; //maximum speed
+    if(cur_speed < -0.2) cur_speed = -0.2; //maximum -speed
 
     // Update the Twist message
-    twist.linear.x = target_linear_vel;
+    twist.linear.x = cur_speed;
     twist.linear.y = 0.0;
     twist.linear.z = 0.0;
 
@@ -54,9 +47,8 @@ int main(int argc, char** argv)
 
     // Publish it and resolve any remaining callbacks
     pub.publish(twist);
-
     ros::spinOnce();
-    
+    loop_rate.sleep();
   }
   
   printf("here\n");
@@ -68,8 +60,28 @@ int main(int argc, char** argv)
   twist.angular.z = 0;
 
   pub.publish(twist);
-  ros::spinOnce();
+}
+
+int main(int argc, char** argv)
+{
+  // Init ROS node
+  ros::init(argc, argv, "turtlebot3_to_goal");
+  ros::NodeHandle nh;
+
+  // Init cmd_vel publisher
+  pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+
+  // Init odom subsciber
+  ros::Subscriber sub = nh.subscribe("/odom", 1000, odomCallback);  
+
+  printf("%s", msg);
+
+  double goal_x;
   
+  std::cout<<"목표지점 x좌표: ";
+  std::cin>>goal_x;
+
+  to_goal(goal_x);
 
   return 0;
 }
