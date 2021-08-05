@@ -30,7 +30,7 @@ void to_goal(double goal_x, double goal_y)
   ros::Rate loop_rate(10);
 
   ros::spinOnce();
-  loop_rate.sleep();
+
   double goal_ang = std::atan2(goal_y - current_y , goal_x - current_x); //골의 세타, 단위는 라디안
   double x_direc = goal_x - current_x;
   double y_direc = goal_y - current_y;
@@ -54,8 +54,8 @@ void to_goal(double goal_x, double goal_y)
     {
       printf("angular!\n");
       double ang_speed = goal_ang - current_angular_z; //+가 좌회전, -가 우회전
-      if(ang_speed > 0.1) ang_speed = 0.1;
-      if(ang_speed < -0.1) ang_speed = -0.1;
+      if(ang_speed > 0.5) ang_speed = 0.5;
+      if(ang_speed < -0.5) ang_speed = -0.5;
       twist.linear.x = 0;
       twist.linear.y = 0;
       twist.linear.z = 0;
@@ -67,7 +67,7 @@ void to_goal(double goal_x, double goal_y)
     else
     {
       double lin_speed = 0.05; //직선
-      if(x_direc != x_direc_orig || y_direc != y_direc_orig) lin_speed *= (-1); //목표지점 벗어나면 후진
+      if(x_direc != x_direc_orig && y_direc != y_direc_orig) lin_speed *= (-1); //목표지점 벗어나면 후진
       twist.linear.x = lin_speed;
       twist.linear.y = 0;
       twist.linear.z = 0;
