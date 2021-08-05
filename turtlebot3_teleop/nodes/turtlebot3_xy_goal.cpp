@@ -27,54 +27,31 @@ int y_direc_orig = 0;
 
 void to_goal(double goal_x, double goal_y)
 {
-  ros::Rate loop_rate(10);
+  ros::Rate loop_rate(100);
 
   ros::spinOnce();
 
-  double goal_ang = std::atan2(goal_y - current_y , goal_x - current_x); //골의 세타, 단위는 라디안
-  double x_direc = goal_x - current_x;
-  double y_direc = goal_y - current_y;
-  if(x_direc > 0) x_direc_orig = 1;
-  else x_direc_orig = 0;
-  if(y_direc > 0) y_direc_orig = 1;
-  else y_direc_orig = 0;
-
-  printf("골의 세타: %f\n",goal_ang);
-
-  while(std::abs(goal_x-current_x) > 0.01 || std::abs(goal_y-current_y) > 0.01)
+  while(true)
   {
-    x_direc = goal_x - current_x;
-    y_direc = goal_y - current_y;
-    if(x_direc > 0) x_direc = 1;
-    else x_direc = 0;
-    if(y_direc > 0) y_direc = 1;
-    else y_direc = 0;
+    double goal_ang = std::atan2(goal_y - current_y , goal_x - current_x); //골의 세타, 단위는 라디안
+    double distance = sqrt(pow(goal_x - current_x, 2) + pow(goal_y - current_y, 2)); //현재 위치와 목표 위치 사이의 거리
+    printf("골의 세타: %f, 남은 거리: %f\n",goal_ang,distance);
 
-    if(std::abs(goal_ang - current_angular_z) > 0.005)
-    {
-      printf("angular!\n");
-      double ang_speed = goal_ang - current_angular_z; //+가 좌회전, -가 우회전
-      if(ang_speed > 0.5) ang_speed = 0.5;
-      if(ang_speed < -0.5) ang_speed = -0.5;
-      twist.linear.x = 0;
-      twist.linear.y = 0;
-      twist.linear.z = 0;
-      twist.angular.x = 0;
-      twist.angular.y = 0;
-      twist.angular.z = ang_speed; 
-    }
-    
-    else
-    {
-      double lin_speed = 0.05; //직선
-      if(x_direc != x_direc_orig && y_direc != y_direc_orig) lin_speed *= (-1); //목표지점 벗어나면 후진
-      twist.linear.x = lin_speed;
-      twist.linear.y = 0;
-      twist.linear.z = 0;
-      twist.angular.x = 0;
-      twist.angular.y = 0;
-      twist.angular.z = 0;
-    }
+    if(distance < 0.01) break;
+
+    double ang_speed = goal_ang - current_angular_z;
+    double lin_speed = distance;
+    if(ang_speed > 0.5) ang_speed = 0.5;
+    if(ang_speed < -0.5) ang_speed = -0.5;
+    if(lin_speed > 0.2) lin_speed = 0.2;
+    if(lin_speed < -0.2) lin_speed = -0.2;
+
+    twist.linear.x = lin_speed;
+    twist.linear.y = 0;
+    twist.linear.z = 0;
+    twist.angular.x = 0;
+    twist.angular.y = 0;
+    twist.angular.z = ang_speed;
 
     // Publish it and resolve any remaining callbacks
     pub.publish(twist);
