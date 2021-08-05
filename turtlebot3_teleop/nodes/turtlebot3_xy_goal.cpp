@@ -43,8 +43,8 @@ void to_goal(double goal_x, double goal_y)
     double lin_speed = distance;
     if(ang_speed > 0.5) ang_speed = 0.5;
     if(ang_speed < -0.5) ang_speed = -0.5;
-    if(lin_speed > 0.2) lin_speed = 0.2;
-    if(lin_speed < -0.2) lin_speed = -0.2;
+    if(lin_speed > 0.1) lin_speed = 0.1;
+    if(lin_speed < -0.1) lin_speed = -0.1;
 
     twist.linear.x = lin_speed;
     twist.linear.y = 0;
