@@ -36,14 +36,14 @@ void to_goal(double goal_x, double goal_y)
     double distance = sqrt(pow(goal_x - current_x, 2) + pow(goal_y - current_y, 2)); //현재 위치와 목표 위치 사이의 거리
     printf("골의 세타: %f, 남은 거리: %f\n",goal_ang,distance);
 
-    if(distance < 0.1) break;
+    if(distance < 0.01) break;
 
     double ang_speed = goal_ang - current_angular_z;
     double lin_speed = distance;
-    if(ang_speed > 0.5) ang_speed = 0.5;
-    if(ang_speed < -0.5) ang_speed = -0.5;
+    if(ang_speed > 2.5) ang_speed = 2.5;
+    if(ang_speed < -2.5) ang_speed = -2.5;
     if(lin_speed > 0.05) lin_speed = 0.05;
-    if(lin_speed < -0.05) lin_speed = -0.05;
+    //if(lin_speed < -0.05) lin_speed = -0.05;
 
     twist.linear.x = lin_speed;
     twist.linear.y = 0;
