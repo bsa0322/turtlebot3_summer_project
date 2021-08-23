@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/home/baesua/deepsort_ws/devel/include/**",
+                "/opt/ros/noetic/include/**",
+                "/home/baesua/deepsort_ws/src/deep_sort_pytorch/include",
+                "/home/baesua/deepsort_ws/src/deep_sort_pytorch/msg",
+                "/home/baesua/deepsort_ws/src/deep_sort_pytorch",
+                "/usr/include/**",
+                "/opt/ros/noetic/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}

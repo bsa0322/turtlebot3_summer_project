@@ -1,0 +1,8 @@
+# generated from catkin/cmake/template/pkg.context.pc.in
+CATKIN_PACKAGE_PREFIX = ""
+PROJECT_PKG_CONFIG_INCLUDE_DIRS = "/home/baesua/deepsort_ws/devel/include;/home/baesua/deepsort_ws/src/deep_sort_pytorch/include".split(';') if "/home/baesua/deepsort_ws/devel/include;/home/baesua/deepsort_ws/src/deep_sort_pytorch/include" != "" else []
+PROJECT_CATKIN_DEPENDS = "rospy;roscpp;std_msgs;message_runtime".replace(';', ' ')
+PKG_CONFIG_LIBRARIES_WITH_PREFIX = "-ldeep_sort_pytorch".split(';') if "-ldeep_sort_pytorch" != "" else []
+PROJECT_NAME = "deep_sort_pytorch"
+PROJECT_SPACE_DIR = "/home/baesua/deepsort_ws/devel"
+PROJECT_VERSION = "0.0.0"

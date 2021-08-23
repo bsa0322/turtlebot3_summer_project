@@ -1,0 +1,8 @@
+prefix=/home/baesua/deepsort_ws/install
+
+Name: deep_sort_pytorch
+Description: Description of deep_sort_pytorch
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -ldeep_sort_pytorch
+Requires: rospy roscpp std_msgs message_runtime

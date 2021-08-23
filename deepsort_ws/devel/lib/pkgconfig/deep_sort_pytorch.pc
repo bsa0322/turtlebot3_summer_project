@@ -1,0 +1,8 @@
+prefix=/home/baesua/deepsort_ws/devel
+
+Name: deep_sort_pytorch
+Description: Description of deep_sort_pytorch
+Version: 0.0.0
+Cflags: -I/home/baesua/deepsort_ws/devel/include -I/home/baesua/deepsort_ws/src/deep_sort_pytorch/include
+Libs: -L${prefix}/lib -ldeep_sort_pytorch
+Requires: rospy roscpp std_msgs message_runtime
