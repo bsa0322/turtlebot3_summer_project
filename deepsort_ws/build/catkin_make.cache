@@ -1,0 +1,2 @@
+deep_sort_pytorch
+-DCATKIN_DEVEL_PREFIX=/home/baesua/deepsort_ws/devel -DCMAKE_INSTALL_PREFIX=/home/baesua/deepsort_ws/install -G Unix Makefiles
