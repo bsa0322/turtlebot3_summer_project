@@ -2,6 +2,7 @@ import os
 import cv2
 import time
 import argparse
+from cv2 import data
 import torch
 import warnings
 import numpy as np
@@ -20,9 +21,6 @@ from utils.parser import get_config
 from utils.log import get_logger
 from utils.io import write_results
 
-bridge = CvBridge()
-VERBOSE = False
-
 class VideoTracker(object):
     def __init__(self, cfg, args, video_path):
         self.cfg = cfg
@@ -37,44 +35,17 @@ class VideoTracker(object):
         if args.display:
             cv2.namedWindow("test", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("test", args.display_width, args.display_height)
+            
 
         if args.cam != -1:
             print("Using webcam " + str(args.cam))
-            self.vdo = cv2.VideoCapture(args.cam)
-        else:
-            self.vdo = cv2.VideoCapture()
+            self.vdo = cv2.imdecode(video_path, cv2.IMREAD_COLOR) 
+        
         self.detector = build_detector(cfg, use_cuda=use_cuda)
         self.deepsort = build_tracker(cfg, use_cuda=use_cuda)
         self.class_names = self.detector.class_names
 
     def __enter__(self):
-        if self.args.cam != -1:
-            ret, frame = self.vdo.read()
-            assert ret, "Error: Camera error"
-            self.im_width = frame.shape[0]
-            self.im_height = frame.shape[1]
-
-        else:
-            assert os.path.isfile(self.video_path), "Path error"
-            self.vdo.open(self.video_path)
-            self.im_width = int(self.vdo.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.im_height = int(self.vdo.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            assert self.vdo.isOpened()
-
-        if self.args.save_path:
-            os.makedirs(self.args.save_path, exist_ok=True)
-
-            # path of saved video and results
-            self.save_video_path = os.path.join(self.args.save_path, "results.avi")
-            self.save_results_path = os.path.join(self.args.save_path, "results.txt")
-
-            # create video writer
-            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            self.writer = cv2.VideoWriter(self.save_video_path, fourcc, 20, (self.im_width, self.im_height))
-
-            # logging
-            self.logger.info("Save results to {}".format(self.args.save_path))
-
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
@@ -84,61 +55,76 @@ class VideoTracker(object):
     def run(self):
         results = []
         idx_frame = 0
-        while self.vdo.grab():
-            idx_frame += 1
-            if idx_frame % self.args.frame_interval:
-                continue
+        #while True:
+        idx_frame += 1
+        #if idx_frame % self.args.frame_interval:
+        #    continue
 
-            start = time.time()
-            _, ori_im = cv2.imdecode(self.video_path, cv2.IMREAD_COLOR)
-            im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
+        start = time.time()
 
-            # do detection
-            bbox_xywh, cls_conf, cls_ids = self.detector(im)
+            
+        #_, ori_im = self.vdo.retrieve()
 
-            # select person class
-            mask = cls_ids == 0
+        #ros->opencv
+            
+        print("video path: ",self.video_path)
+        ori_im = cv2.imdecode(self.video_path, cv2.IMREAD_COLOR) 
+        if ori_im.data == False:
+            print("Image not found")
+            #break
+            
+        cv2.imshow('cv_img',ori_im)
+        cv2.waitKey(2)
+        im = cv2.cvtColor(ori_im, cv2.COLOR_BGR2RGB)
+            
 
-            bbox_xywh = bbox_xywh[mask]
-            # bbox dilation just in case bbox too small, delete this line if using a better pedestrian detector
-            bbox_xywh[:, 3:] *= 1.2
-            cls_conf = cls_conf[mask]
+        #카메라 크기 얻어옴
+        width = np.size(ori_im, 1)
+        height = np.size(ori_im, 0)
+        print("카메라 크기",width,height)
+            
 
-            # do tracking
-            outputs = self.deepsort.update(bbox_xywh, cls_conf, im)
+        # do detection
+        bbox_xywh, cls_conf, cls_ids = self.detector(im)
 
-            # draw boxes for visualization
-            if len(outputs) > 0:
-                bbox_tlwh = []
-                bbox_xyxy = outputs[:, :4]
-                identities = outputs[:, -1]
-                ori_im = draw_boxes(ori_im, bbox_xyxy, identities)
+        # select person class
+        mask = cls_ids == 0
 
-                for bb_xyxy in bbox_xyxy:
-                    bbox_tlwh.append(self.deepsort._xyxy_to_tlwh(bb_xyxy))
+        bbox_xywh = bbox_xywh[mask]
+        # bbox dilation just in case bbox too small, delete this line if using a better pedestrian detector
+        bbox_xywh[:, 3:] *= 1.2
+        cls_conf = cls_conf[mask]
 
-                results.append((idx_frame - 1, bbox_tlwh, identities))
+        # do tracking
+        outputs = self.deepsort.update(bbox_xywh, cls_conf, im)
 
-            end = time.time()
+        # draw boxes for visualization
+        if len(outputs) > 0:
+            bbox_tlwh = []
+            bbox_xyxy = outputs[:, :4]
+            identities = outputs[:, -1]
+            ori_im = draw_boxes(width, height, ori_im, bbox_xyxy, identities)
 
-            if self.args.display:
-                cv2.imshow("test", ori_im)
-                cv2.waitKey(1)
+            for bb_xyxy in bbox_xyxy:
+                bbox_tlwh.append(self.deepsort._xyxy_to_tlwh(bb_xyxy))
 
-            if self.args.save_path:
-                self.writer.write(ori_im)
+            results.append((idx_frame - 1, bbox_tlwh, identities))
 
-            # save results
-            write_results(self.save_results_path, results, 'mot')
+        end = time.time()
 
-            # logging
-            self.logger.info("time: {:.03f}s, fps: {:.03f}, detection numbers: {}, tracking numbers: {}" \
-                             .format(end - start, 1 / (end - start), bbox_xywh.shape[0], len(outputs)))
+        if self.args.display:
+            cv2.imshow("test", ori_im)
+            cv2.waitKey(1)
+
+        # logging
+        self.logger.info("time: {:.03f}s, fps: {:.03f}, detection numbers: {}, tracking numbers: {}" \
+                            .format(end - start, 1 / (end - start), bbox_xywh.shape[0], len(outputs)))
+        rospy.spin()
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    #parser.add_argument("VIDEO_PATH", type=str)
+    parser.add_argument("VIDEO_PATH", type=str)
     parser.add_argument("--config_detection", type=str, default="./configs/yolov3.yaml")
     parser.add_argument("--config_deepsort", type=str, default="./configs/deep_sort.yaml")
     # parser.add_argument("--ignore_display", dest="display", action="store_false", default=True)
@@ -151,44 +137,35 @@ def parse_args():
     parser.add_argument("--camera", action="store", dest="cam", type=int, default="-1")
     return parser.parse_args()
 
+
 #ros -> opencv
 class image_feature:
-      
       def __init__(self):
+            rospy.init_node('image_feature', anonymous=True)
             self.subscriber = rospy.Subscriber("/raspicam_node/image/compressed", CompressedImage, self.callback, queue_size = 1)
-            if VERBOSE:
-                  print("subscribed to /raspicam_node/image/compressed")
+           
       def callback(self, ros_data):
-        if VERBOSE:
-          print('received image of type: "%s"' % ros_data.format)
 
-        video_path = np.fromstring(ros_data.data, np.uint8)
-
-        with VideoTracker(cfg, args, video_path) as vdo_trk:
-            vdo_trk.run()
-
-#ros -> opencv
-def main(args):
-    
-    '''Initializes and cleanup ros node'''
-    ic = image_feature()
-    rospy.init_node('image_feature', anonymous=True)
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        print ("Shutting down ROS Image feature detector module")
-    cv2.destroyAllWindows()
+        _video_path = np.fromstring(ros_data.data, np.uint8)
+        
+        try:
+            args = parse_args()
+            cfg = get_config()
+            cfg.merge_from_file(args.config_detection)
+            cfg.merge_from_file(args.config_deepsort)
+            
+            print("ros work")
+            with VideoTracker(cfg, args, _video_path) as vdo_trk:
+                vdo_trk.run()
+            
+        except KeyboardInterrupt:
+            print ("Shutting down ROS Image feature detector module")
 
 if __name__ == "__main__":
-    
-    args = parse_args()
-    cfg = get_config()
-    cfg.merge_from_file(args.config_detection)
-    cfg.merge_from_file(args.config_deepsort)
-
-    #ros -> opencv
-    main(sys.argv)
-
+    #ros->opencv
+    ic = image_feature()
+    #vt = VideoTracker()
+    rospy.spin()
     
 
     
