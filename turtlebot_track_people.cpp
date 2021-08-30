@@ -1,10 +1,12 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
-#include <nav_msgs/Odometry.h>
+#include <deep_sort_pytorch/Bound.h>
 #include <std_msgs/String.h>
+#include <sensor_msgs/LaserScan.h>
 #include <tf/transform_listener.h>
 
 #include <stdio.h>
+#include <vector>
 #include <cmath>
 
 // Reminder message
@@ -19,10 +21,12 @@ ros::Publisher pub;
 // Create Twist message
 geometry_msgs::Twist twist;
 
-double x1,x2,y1,y2;
-double size = 0.5;
+//바운드 좌표 및 크기
+double _x1, _x2, _y1, _y2;
+double size;
 
-
+//레이저 센서 앞에 장애물과의 거리
+std::vector <float> _ranges;
 
 void found_people()
 {
@@ -33,7 +37,7 @@ void found_people()
   {
     twist.angular.z = 0.1;
 
-    if(x1 != 0 || x2 != 0 || y1 != 0 || y2 != 0) break;
+    if(_x1 != 0 || _x2 != 0 || _y1 != 0 || _y2 != 0) break;
 
     // Publish it and resolve any remaining callbacks
     pub.publish(twist);
@@ -53,30 +57,46 @@ void track_people()
   ros::spinOnce();
 
   twist.linear.y = twist.linear.z = twist.angular.x = twist.angular.y = 0;
+  size = fabs(_x2-_x1)*fabs(_y2-_y1);
+
+  double size2 = size;
 
   while(true)
   {
-    double x = (x1+x2)/2;
-    double y = (y1+y2)/2;
-    double size2 = abs(x2-x1)*abs(y2-y1);
+    if(_x1 == -1) break;
+
+    double x = (_x1+_x2)/2;
+    double y = (_y1+_y2)/2;
 
     double linear_speed = size - size2;
     if(linear_speed > 0.05) linear_speed = 0.05;
     if(linear_speed < -0.05) linear_speed = -0.05;
 
     double angular_speed = 0.5 - x;
-    if(angular_speed > 0.2) angular_speed = 0.2;
-    if(angular_speed < -0.2) angular_speed = -0.2;
+    if(angular_speed > 0.1) angular_speed = 0.1;
+    if(angular_speed < -0.1) angular_speed = -0.1;
 
     //장애물 처리
+    if(linear_speed > 0 && _ranges[0] < 0.5)
+    {
+      linear_speed *= (-1);
+    }
+    else if(linear_speed < 0 && _ranges[180] < 0.5)
+    {
+      linear_speed *= (-1);
+    }
 
     twist.linear.x = linear_speed;
     twist.angular.z = angular_speed;
    
+    size = size2;
+    
     // Publish it and resolve any remaining callbacks
     pub.publish(twist);
     ros::spinOnce();
     loop_rate.sleep();
+    
+    size2 = fabs(_x2-_x1)*fabs(_y2-_y1);
   }
 
   twist.linear.x = 0;
@@ -84,15 +104,22 @@ void track_people()
   pub.publish(twist);
 }
 
-void boundCallback(const nav_msgs::Odometry::ConstPtr& bound)
+void boundCallback(const deep_sort_pytorch::Bound::ConstPtr& bound)
 {
-  //x1, x2, y1, y2 받아오기
-  ROS_INFO("I received bound: [%f, %f, %f, %f]", x1, x2, y1, y2); //받았다는 걸 명시...!
+  _x1 = bound->x1;
+  _x2 = bound->x2;
+  _y1 = bound->y1;
+  _y2 = bound->y2;
+
+  ROS_INFO("I received bound: [%lf, %lf, %lf, %lf]", _x1, _x2, _y1, _y2); //받았다는 걸 명시...!
 }
 
-void rangesCallback()
+void rangesCallback(const sensor_msgs::LaserScan::ConstPtr& laser)
 {
   //받아오기
+  _ranges = laser->ranges;
+
+  ROS_INFO("I received ranges: [%f, %f]", _ranges[0], _ranges[360]);
 }
 
 int main(int argc, char** argv)
@@ -105,14 +132,18 @@ int main(int argc, char** argv)
   pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
 
   // Init odom subsciber
-  ros::Subscriber sub = nh.subscribe("bound", 1000, boundCallback);  //카메라 바운드 좌표 받아오기
-  ros::Subscriber sub2 = nh.subscribe("ranges", 1000, rangesCallback); //장애물 센서 거리 받아오기
+  ros::Subscriber sub = nh.subscribe("bound_topic", 1000, boundCallback);  //카메라 바운드 좌표 받아오기
+  ros::Subscriber sub2 = nh.subscribe("/scan", 1000, rangesCallback); //장애물 센서 거리 받아오기
 
   printf("%s", msg);
 
-  found_people();
+  while(true)
+  {
+    found_people();
+    track_people();
 
-  track_people();
+    ros::spinOnce();
+  }
 
   return 0;
 }

@@ -5,6 +5,10 @@ import argparse
 import torch
 import warnings
 import numpy as np
+import rospy
+
+from geometry_msgs.msg import Twist
+from deep_sort_pytorch.msg import Bound
 
 from detector import build_detector
 from deep_sort import build_tracker
@@ -47,11 +51,11 @@ class VideoTracker(object):
             self.im_height = frame.shape[1]
 
         else:
-            assert os.path.isfile(self.video_path), "Path error"
+            #assert os.path.isfile(self.video_path), "Path error"
             self.vdo.open(self.video_path)
             self.im_width = int(self.vdo.get(cv2.CAP_PROP_FRAME_WIDTH))
             self.im_height = int(self.vdo.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            assert self.vdo.isOpened()
+            #assert self.vdo.isOpened()
 
         if self.args.save_path:
             os.makedirs(self.args.save_path, exist_ok=True)
@@ -104,6 +108,8 @@ class VideoTracker(object):
             # do tracking
             outputs = self.deepsort.update(bbox_xywh, cls_conf, im)
 
+            rospy.init_node('yolov3_deepsort', anonymous=True)
+
             # draw boxes for visualization
             if len(outputs) > 0:
                 bbox_tlwh = []
@@ -115,7 +121,15 @@ class VideoTracker(object):
                     bbox_tlwh.append(self.deepsort._xyxy_to_tlwh(bb_xyxy))
 
                 results.append((idx_frame - 1, bbox_tlwh, identities))
-
+            else:
+                #토픽 전달
+                bound_pub = rospy.Publisher('bound_topic', Bound, queue_size=10)
+                bound_message = Bound()
+                bound_message.x1 = -1
+                bound_message.x2 = 0
+                bound_message.y1 = 0
+                bound_message.y2 = 0
+                bound_pub.publish(bound_message)
             end = time.time()
 
             if self.args.display:
